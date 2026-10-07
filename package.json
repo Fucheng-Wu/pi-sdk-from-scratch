@@ -1,0 +1,25 @@
+{
+  "name": "pi-sdk-from-scratch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "沿着一次真实会话，从零理解 Pi Coding Agent SDK",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "example": "node --env-file=.env --import=tsx",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.99.2",
+    "@earendil-works/pi-coding-agent": "0.99.2",
+    "@sinclair/typebox": "^0.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

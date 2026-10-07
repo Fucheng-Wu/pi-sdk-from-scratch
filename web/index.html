@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="沿着一次真实会话，从零理解 Pi Coding Agent SDK 的中文互动教程。"
+    />
+    <title>Pi SDK from Scratch</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="sidebar" aria-label="教程目录">
+        <a class="brand" href="#top" aria-label="回到教程首页">
+          <span class="brand-mark">π</span>
+          <span>Pi SDK<br /><strong>from Scratch</strong></span>
+        </a>
+        <p class="sidebar-intro">从一次真实会话出发，而不是从 API 列表开始。</p>
+        <nav id="chapter-nav" class="chapter-nav"></nav>
+        <div class="sidebar-foot">
+          <span id="reading-progress">01 / 08</span>
+          <a href="../README.md">GitHub README ↗</a>
+        </div>
+      </aside>
+
+      <main id="top" class="main-content">
+        <header class="hero">
+          <p class="eyebrow">PI CODING AGENT SDK · 中文学习路线</p>
+          <h1>先让一个 Agent 跑起来，<br />再理解它为什么能跑。</h1>
+          <p class="hero-copy">
+            这不是接口参考。我们沿着一个会话在运行时经过的边界，逐层认识模型、资源、扩展和持久化。
+          </p>
+          <div class="hero-meta">
+            <span>16 个章节</span><span>·</span><span>16 个可运行示例</span><span>·</span><span>Node.js 22.19+</span>
+          </div>
+        </header>
+
+        <section class="route-card" aria-label="学习路线">
+          <p>阅读方式</p>
+          <strong>左边选择问题，右边阅读答案；代码面板始终指向该章可运行文件。</strong>
+        </section>
+
+        <section id="article" class="article" aria-live="polite"></section>
+        <nav class="pager" aria-label="章节导航">
+          <button id="previous" type="button">← 上一章</button>
+          <button id="next" type="button">下一章 →</button>
+        </nav>
+      </main>
+
+      <aside class="code-pane" aria-label="本章源码">
+        <div class="code-pane-head">
+          <span>本章源码</span>
+          <a id="source-link" href="../src/01-first-session.ts">打开文件 ↗</a>
+        </div>
+        <p id="source-name" class="source-name"></p>
+        <pre id="source-code" class="source-code"><code>加载源码中…</code></pre>
+      </aside>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
