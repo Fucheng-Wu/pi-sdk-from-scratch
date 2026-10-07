@@ -11,29 +11,39 @@ Pi SDK 的能力很多：模型、工具、Skills、扩展、MCP、持久化会�
 ## 学习路线
 
 ```text
-01 一次会话能跑起来
+01 初始化：最小项目边界
         ↓
-02 看见消息、流和队列
+02 让一次会话跑起来
         ↓
-03 给会话挑选模型与认证
+03 看见消息、流和队列
         ↓
-04 ResourceLoader 总览与 System Prompt
+04 模型、认证与 ModelRuntime
         ↓
-05 Skills：筛选与一次性注入
+05 createAgentSession：配置与队列
         ↓
-06 加载 Extension：文件与内联工厂
+06 隔离认证与模型配置
         ↓
-07 AGENTS.md：项目级上下文
+07 ResourceLoader 总览与 System Prompt
         ↓
-08 Prompt Template：/命令式快捷短语
+08 Skills：筛选与一次性注入
         ↓
-09 Extension：事件、工具和命令
+09 加载 Extension：文件与内联工厂
         ↓
-10 Codemode、Tool Search 与 MCP
+10 AGENTS.md：项目级上下文
         ↓
-11 Settings 与 SessionManager
+11 Prompt Template：/命令式快捷短语
         ↓
-12 AgentSessionRuntime：支持新建、切换、恢复和分叉的宿主
+12 Extension：事件、工具和命令
+        ↓
+13 Codemode、Tool Search 与 MCP
+        ↓
+14 SettingsManager：有效配置与写盘边界
+        ↓
+15 SessionManager：四种历史模式
+        ↓
+16 AgentSessionRuntime：支持新建、切换、恢复和分叉的宿主
+        ↓
+17 官方示例：Full Control
 ```
 
 这不是官方示例的重排序：尤其在 ResourceLoader 部分，本项目把系统提示词、Skills、扩展发现、`AGENTS.md` 和 Prompt Template 拆为五个连续章节。每一章先解释“你正在解决的产品问题”，再给出最小代码和运行边界。详细的互动阅读页在 [`web/`](web/)；可运行示例在 [`src/`](src/)。

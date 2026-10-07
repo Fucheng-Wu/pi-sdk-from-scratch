@@ -35,7 +35,7 @@ const chapters = [
         heading: "你现在要解决什么？",
         paragraphs: [
           "你想在自己的 Node.js 程序里使用一个能读文件、调用工具和回复文本的 coding agent。此时不需要先实现 CLI；SDK 已经把 Agent harness 封装在 <code>AgentSession</code> 里。",
-          "<code>createAgentSession()</code> 创建的是“一次对话”，不是整个应用。它有消息历史、模型、工具、排队消息和扩展上下文。一次性脚本最适合配合 <code>SessionManager.inMemory()</code>。",
+          "<code>createAgentSession()</code> 创建的是“一次对话”，不是整个应用。它有消息历史、模型、工具、排队消息、压缩状态和扩展运行时。一次性脚本最适合配合 <code>SessionManager.inMemory()</code>。",
         ],
       },
       {
@@ -64,16 +64,37 @@ const chapters = [
         heading: "流式事件与最终结果是两件事",
         paragraphs: [
           "终端里一个字一个字出现的效果来自 <code>session.subscribe()</code>。订阅 <code>message_update</code>，并在 assistant 的 <code>text_delta</code> 事件到来时渲染增量。",
-          "这只是呈现通道。一次运行结束后，完整状态仍在 <code>session.state.messages</code>，最终文本可以从 <code>getLastAssistantText()</code> 读取。不要把临时 delta 当作唯一数据源。",
+          "这只是呈现通道。一次运行结束后，完整状态仍在 <code>session.state.messages</code>（数组形式）或 <code>session.messages</code>（额外包含自定义类型消息）：一个 JSON 数组，元素按 role 分为 system、user、assistant 三类，每个对象都带 timestamp。最终文本可以从 <code>getLastAssistantText()</code> 读取，不要把临时 delta 当作唯一数据源。",
         ],
       },
       {
         heading: "System 消息：Agent 一开始知道什么？",
-        paragraphs: ["System 消息里的 <code>preamble</code> 给出角色：运行在 Pi harness 内的编码助手，能够读文件、执行命令、编辑和写入代码。<code>tools</code> 段描述基础 read、bash、edit、write 工具的用途；详细参数 schema 在 toolsAdded 中。"],
+        paragraphs: [
+          "System 消息由 Pi 组装。<code>preamble</code> 给出角色定位：「You are an expert coding assistant operating inside pi, a coding agent harness...」——它是运行在 Pi 框架内的专家级编码助手，职责是读文件、执行命令、编辑代码和写新文件。",
+          "<code>tools</code> 段描述基础工具及其用途，参数 schema 在 <code>toolsAdded</code> 中；<code>rules</code> 是行为规则，<code>docs</code> 指向 Pi 文档，<code>skills</code> 与 <code>cwd</code> 分别是可用技能和当前工作目录。",
+        ],
+      },
+      {
+        heading: "基础工具与 toolsAdded",
+        table: {
+          head: ["工具", "用途"],
+          rows: [
+            ["<code>read</code>", "读取文件内容"],
+            ["<code>bash</code>", "执行 bash 命令（ls、grep、find 等）"],
+            ["<code>edit</code>", "精确文本替换编辑，支持一次多段"],
+            ["<code>write</code>", "创建 / 覆盖文件"],
+          ],
+        },
+        paragraphs: [
+          "如果项目注册了自定义工具，也会一并列出。toolsAdded 进一步给出 read（path/offset/limit）、bash（command/timeout）、edit（path/edits）、write（path/content）的完整参数 schema，每项都带 <code>constrainedSampling: json_schema</code>、<code>strict: prefer</code>。",
+        ],
+      },
+      {
+        heading: "rules、docs 与元数据",
         bullets: [
-          "<strong>rules</strong>：例如文件读取方式、edit 的精确匹配、避免重叠编辑、简洁回复和输出工作路径。",
-          "<strong>docs</strong>：Pi README、docs、examples 的位置，以及涉及 extensions、skills、MCP 等主题时先读文档的规则。",
-          "<strong>skills / cwd / timestamp / toolsAdded</strong>：分别记录可用方法、工作目录、时间与工具参数 schema。",
+          "<strong>rules</strong>：文件操作用 bash；查看文件用 read 而不是 cat/sed；可检查 <code>PI_*</code> 环境变量获取模型和会话信息；edit 的 <code>oldText</code> 必须精确唯一匹配；多处修改合并为一次 edit 调用；避免重叠或嵌套编辑；保持简洁回复并明确显示工作文件路径。",
+          "<strong>docs</strong>：主文档在 <code>node_modules/@earendil-works/pi-coding-agent/README.md</code>，同目录还有 docs 与 examples；涉及 extensions、themes、skills、prompt-templates、TUI、keybindings、SDK、custom-provider、models、packages、environment-variables、MCP servers 等主题时，要求先完整阅读 .md 与交叉引用。",
+          "<strong>timestamp</strong>：组装时刻的毫秒时间戳；messages 数组中的每个对象也各自带 timestamp。",
         ],
       },
       {
@@ -82,7 +103,41 @@ const chapters = [
       },
       {
         heading: "Assistant 消息：回答之外还有运行事实",
-        paragraphs: ["Assistant 消息可包含 thinking 与 text；其元数据还会记录 API、provider、model、token 用量、缓存、成本、stopReason、rawStopReason、thinkingLevel、responseId 和 timestamp。UI 通常显示 text，监控与计费系统则需要读取这些运行事实。"],
+        paragraphs: [
+          "Assistant 消息可能同时包含 thinking（思考过程）与 text（实际回复）。除此之外，它还带调用与计费元数据：API、provider、model、token 用量（input / output / cacheRead / cacheWrite / reasoning / totalTokens）以及成本。",
+          "下面的示例值来自一次真实的 deepseek 运行；UI 通常只显示 text，监控与计费系统则读取这些运行事实。",
+        ],
+        table: {
+          head: ["字段", "示例值"],
+          rows: [
+            ["api", "openai-completions"],
+            ["provider", "deepseek"],
+            ["model", "deepseek-v4-pro"],
+            ["usage.input / output", "98 / 193"],
+            ["usage.cacheRead / cacheWrite", "3584 / 0"],
+            ["usage.reasoning", "122"],
+            ["usage.totalTokens", "3875"],
+            ["usage.cost.input", "$0.00012936"],
+            ["usage.cost.output", "$0.00076428"],
+            ["usage.cost.cacheRead", "$0.0001577"],
+            ["usage.cost.total", "$0.0010513"],
+          ],
+        },
+      },
+      {
+        heading: "执行状态元数据",
+        table: {
+          head: ["字段", "示例值"],
+          rows: [
+            ["stopReason / rawStopReason", "stop / stop"],
+            ["thinkingLevel", "high"],
+            ["responseId", "3c5e123b-f37f-2543-9f24-3fcb02456eb0"],
+            ["timestamp", "1791282854075"],
+          ],
+        },
+      },
+      {
+        heading: "会话状态速查",
         diagram: "AgentSession\n├─ state.messages        system / user / assistant 的对话事实\n├─ model / thinkingLevel 当前模型决策\n├─ systemPrompt          组装后的系统上下文\n├─ getActiveToolNames()  实际可用能力\n└─ subscribe()           UI 的实时事件来源",
       },
       {
@@ -99,12 +154,13 @@ const chapters = [
     lead: "会话知道如何推理之前，必须知道该使用哪个模型、哪里读认证、哪些模型真的可以调用。这些不属于 Session 的业务逻辑，而属于 ModelRuntime。",
     blocks: [
       {
-        heading: "先发现，再选择",
-        paragraphs: ["<code>ModelRuntime.create()</code> 负责模型目录与认证。<code>getModel(provider, id)</code> 用于按名字找模型；<code>getAvailable()</code> 更适合产品的默认选择，因为它只返回当前认证有效的模型。"],
+        heading: "三种找模型的方式",
+        paragraphs: ["<code>ModelRuntime.create()</code> 负责模型目录与认证。找模型有三条路，对应不同的使用场景："],
         bullets: [
-          "显式指定 <code>model</code>：产品希望固定 Provider 或模型。",
-          "指定 <code>thinkingLevel</code>：表达 off / low / medium / high 的推理偏好；最终能力仍受模型限制。",
-          "复用同一个 <code>modelRuntime</code>：让会话共享同一套模型与认证上下文。",
+          "Option 1：<code>modelRuntime.getModel(\"anthropic\", \"claude-opus-4-5\")</code>，按 provider/id 精确查找内置模型。",
+          "Option 2：注册在 <code>models.json</code> 里的自定义模型走同一个入口，如 <code>getModel(\"my-provider\", \"my-model\")</code>。",
+          "Option 3：选择不确定时用 <code>getAvailable()</code>；它只返回当前认证有效的模型，适合作为产品默认值。",
+          "选好之后显式传入 <code>model</code> 与 <code>thinkingLevel</code>（off / low / medium / high）；复用同一个 <code>modelRuntime</code> 可让会话共享同一套模型与认证上下文。",
         ],
       },
       {
@@ -126,11 +182,11 @@ const chapters = [
       {
         heading: "最常用的装配参数",
         bullets: [
-          "<code>cwd</code>：文件工具、项目级资源、设置和会话归属的根。",
-          "<code>model</code> / <code>modelRuntime</code> / <code>thinkingLevel</code>：选择推理能力。",
-          "<code>tools</code>、<code>excludeTools</code>、<code>noTools</code>：控制内置工具；<code>tools</code> 是白名单。",
+          "<code>cwd</code>：Agent 工作目录；影响文件工具、项目级配置、上下文文件和会话归属。",
+          "<code>model</code> / <code>modelRuntime</code> / <code>thinkingLevel</code>：选择推理能力；未指定模型时，从设置或可用模型中选择，thinkingLevel 最终受模型能力限制。",
+          "<code>tools</code>、<code>excludeTools</code>、<code>noTools</code>：控制内置工具；<code>tools</code> 是白名单，<code>noTools</code> 的 <code>\"all\"</code> 禁用全部工具、<code>\"builtin\"</code> 只禁用默认内置工具。",
           "<code>customTools</code>：注入工具定义；更复杂的工具一般经由 Extension 注册。",
-          "<code>resourceLoader</code>、<code>settingsManager</code>、<code>sessionManager</code>：分别提供资源、配置与历史策略。",
+          "<code>resourceLoader</code>、<code>settingsManager</code>、<code>sessionManager</code>：分别提供资源、配置与历史策略；不指定 sessionManager 时默认创建磁盘持久化会话。",
         ],
       },
       {
@@ -152,7 +208,10 @@ const chapters = [
     blocks: [
       {
         heading: "ModelRuntime 的两条路径",
-        paragraphs: ["<code>authPath</code> 指向 API Key 或 OAuth 凭据，<code>modelsPath</code> 指向模型清单。显式指定后，开发、测试、生产环境可以互不影响，也不会误读用户的默认 Pi 配置。"],
+        paragraphs: [
+          "不传 <code>modelRuntime</code> 时，SDK 使用默认运行时，从 agentDir（如 <code>~/.pi/agent</code>）读取认证与模型清单。",
+          "<code>authPath</code> 指向 API Key 或 OAuth 凭据，<code>modelsPath</code> 指向模型清单。显式指定后，开发、测试、生产环境可以互不影响，也不会误读用户的默认 Pi 配置。",
+        ],
       },
       {
         heading: "运行时 Key 覆盖",
@@ -169,7 +228,7 @@ const chapters = [
     blocks: [
       {
         heading: "DefaultResourceLoader 在收集什么？",
-        paragraphs: ["它以 <code>cwd</code> 和 <code>agentDir</code> 为根，发现项目与用户级资源；随后 <code>reload()</code> 让这些资源成为创建会话时的候选项。<code>cwd</code> 不只是文件工具的工作目录，它也影响项目级设置、上下文文件与会话归属。"],
+        paragraphs: ["它以 <code>cwd</code> 和 <code>agentDir</code> 为根，发现扩展、Skills、提示词模板、主题、AGENTS.md 等资源；随后 <code>reload()</code> 让这些资源成为创建会话时的候选项。<code>cwd</code> 不只是文件工具的工作目录，它也影响项目级设置、上下文文件与会话归属。"],
         diagram: "cwd / agentDir\n├─ AGENTS.md        项目上下文\n├─ skills/          可按需加载的方法\n├─ prompts/         /deploy 之类的文本模板\n├─ extensions/      事件、工具、命令\n└─ settings.json    设置与额外路径\n          ↓\n DefaultResourceLoader → AgentSession",
       },
       {
@@ -199,7 +258,10 @@ const chapters = [
     blocks: [
       {
         heading: "默认发现与覆盖回调",
-        paragraphs: ["<code>DefaultResourceLoader</code> 会先收集它能发现的 Skills。<code>skillsOverride(current)</code> 接到的 <code>current</code> 就是这份候选集合：你可以保留、筛选、补充或替换，并同时保留 <code>diagnostics</code>。"],
+        paragraphs: [
+          "<code>DefaultResourceLoader</code> 会先收集它能发现的 Skills。<code>skillsOverride(current)</code> 接到的 <code>current</code> 就是这份候选集合：你可以保留、筛选、补充或替换。",
+          "示例只保留名称包含 <code>browser</code> 或 <code>search</code> 的技能，再追加一个合成 Skill；<code>current.diagnostics</code> 里的扫描警告会原样保留，最后通过 <code>loader.getSkills()</code> 打印出来。",
+        ],
       },
       {
         heading: "为什么要使用合成来源？",
@@ -224,14 +286,17 @@ const chapters = [
     blocks: [
       {
         heading: "默认会到哪里找？",
-        paragraphs: ["默认 ResourceLoader 会从用户级 <code>~/.pi/agent/extensions/</code>、项目级 <code>&lt;cwd&gt;/.pi/extensions/</code>，以及 settings 中声明的扩展路径发现文件。每个扩展文件导出默认函数 <code>export default function (pi) { ... }</code>。"],
+        paragraphs: [
+          "默认 ResourceLoader 会从用户级 <code>~/.pi/agent/extensions/</code>、项目级 <code>&lt;cwd&gt;/.pi/extensions/</code>，以及 settings.json 的 <code>\"extensions\"</code> 数组发现文件。每个扩展文件是 TypeScript 文件，导出默认函数 <code>export default function (pi: ExtensionAPI) { ... }</code>。",
+          "扩展不仅能拦截 <code>agent_start</code>、<code>tool_call</code>、<code>agent_end</code> 等事件，还能注册自定义工具与交互命令；能力注册的细节在 Extension 一章展开。",
+        ],
       },
       {
         heading: "additionalExtensionPaths 与 extensionFactories",
         bullets: [
           "<code>additionalExtensionPaths</code>：加载外部 TypeScript 文件。它适合可被分享、独立维护的扩展。",
           "<code>extensionFactories</code>：直接传入函数，不落盘；适合 SDK 宿主内置的小型行为。",
-          "两者效果可以组合。示例同时加载一个文件扩展和一个内联扩展，方便观察它们共享同一个生命周期。",
+          "两者注册出的扩展能力等价，只是来源不同，也可以组合使用；示例同时加载一个文件扩展和一个内联扩展，方便观察它们共享同一个生命周期。",
         ],
       },
       {
@@ -254,7 +319,7 @@ const chapters = [
       {
         heading: "什么时候该写进 AGENTS.md？",
         bullets: [
-          "任何每次修改代码都要遵守的项目约束，例如 TypeScript strict、测试命令与目录边界。",
+          "任何每次修改代码都要遵守的项目约束，例如 TypeScript strict、禁用 any、测试命令与目录边界。",
           "团队特有的术语和不能从代码直接推断的流程。",
           "不要把频繁变化的任务指令写进去；那更适合当前 prompt 或 prompt template。",
         ],
@@ -329,8 +394,13 @@ const chapters = [
         ],
       },
       {
-        heading: "一个容易踩到的限制",
-        paragraphs: ["Codemode 和 Tool Search 注册后并不一定激活。可用 <code>defaultTools: [\"+codemode\", \"+tool_search\"]</code> 追加启用，也可由 MCP 的 exposure 配置激活。这里的 <code>+</code> 很重要：它表示在默认工具集上追加。"],
+        heading: "默认非激活，以及两种激活方式",
+        paragraphs: [
+          "codemode 与 tool_search 注册时是未激活（inactive）的，需要满足以下任一条件才启用：一是通过 <code>defaultTools</code> 显式启用；二是由 MCP 扩展自动激活——MCP 服务器配置为 <code>codemode</code> 暴露方式会激活 codemode，配置为 <code>deferred</code> 暴露方式会激活 tool_search。",
+          "示例用 <code>defaultTools: [\"+codemode\", \"+tool_search\"]</code> 追加启用；<code>+</code> 表示在默认工具集上增加，而不是替换（无 <code>+</code> 会覆盖原有默认工具）。",
+          "激活后 <code>getActiveToolNames()</code> 会显示：<code>read, bash, edit, write, codemode, tool_search</code>——说明它们也是内置工具，只是默认没有启用。",
+          "<code>session.bindExtensions({})</code> 会触发 session_start，MCP 服务器随后在后台开始连接。",
+        ],
       },
       {
         heading: "为什么不要在这里使用 tools 白名单？",
@@ -372,7 +442,7 @@ const chapters = [
           "<code>inMemory()</code>：不落盘，适合测试和一次性后台任务。",
           "<code>create(cwd)</code>：创建新的持久化会话，并在 sessionFile 中暴露其路径。",
           "<code>continueRecent(cwd)</code>：恢复最近会话；原模型不可用时检查 modelFallbackMessage。",
-          "<code>list(cwd)</code> + <code>open(path)</code>：先列出会话元数据，再按精确路径恢复。",
+          "<code>list(cwd)</code> + <code>open(path)</code>：先列出会话元数据（含 <code>id</code>、<code>firstMessage</code>、<code>path</code>），再按精确路径恢复。",
         ],
       },
       {
@@ -393,7 +463,7 @@ const chapters = [
     blocks: [
       {
         heading: "先建立对象模型",
-        diagram: "AgentSessionRuntime（长期存在的控制器）\n├─ session       当前会话；会被替换\n├─ services      当前 cwd 的模型、设置、资源\n└─ createRuntime 创建下一套 services + session 的工厂\n\nAgentSession（一次具体对话）\n├─ Agent / 模型调用状态\n├─ extensionRunner\n├─ 事件订阅者\n└─ sessionManager",
+        diagram: "AgentSessionRuntime（长期存在的控制器）\n├─ session       当前会话；会被替换\n├─ services      当前 cwd 的模型、设置、资源\n└─ createRuntime 创建下一套 services + session 的工厂\n\nAgentSession（一次具体对话）\n├─ Agent / 模型调用状态\n├─ extensionRunner / 扩展上下文\n├─ 事件订阅者\n└─ sessionManager\n\nSessionManager（会话事实的存储）\n├─ 会话树、消息条目\n├─ 当前工作目录 cwd\n└─ JSONL 会话文件及持久化逻辑",
       },
       {
         heading: "替换发生时，Runtime 做了什么？",
@@ -405,18 +475,68 @@ const chapters = [
       },
       {
         heading: "createRuntime：可重复执行的组装工厂",
-        paragraphs: ["Runtime 在启动、new、switch、fork、import 时调用同一个工厂。工厂接收 <code>cwd</code>、<code>sessionManager</code> 和 <code>sessionStartEvent</code>，先创建服务，再用服务创建 AgentSession，最后返回 <code>{ session, services, diagnostics }</code>。这就是为什么切换后不会错误复用旧项目环境。"],
+        paragraphs: ["Runtime 在启动、new、switch、fork、import 时调用同一个工厂。工厂的参数由 Runtime 传入：<code>cwd</code>（新会话关联的工作目录）、<code>sessionManager</code>（历史管理策略）、<code>sessionStartEvent</code>（本次创建的原因，如 new / resume / fork）。工厂先创建服务，再用服务创建 AgentSession，最后返回 <code>{ session, services, diagnostics }</code>。这就是为什么切换后不会错误复用旧项目环境。"],
       },
       {
         heading: "为什么 services 和 session 分两步创建？",
         paragraphs: ["<code>AgentSessionServices</code> 属于项目环境：cwd、agentDir、ModelRuntime、SettingsManager、ResourceLoader 与诊断信息。<code>AgentSession</code> 才把这些环境设施和特定的历史管理器、模型、工具、启动事件结合为一次对话。环境可以随着 cwd 更换，会话也可以在同一环境内再次创建。"],
       },
       {
+        heading: "会话 JSONL 的开头长什么样？",
+        paragraphs: ["切换或恢复会话时，先读取 JSONL 文件前几行的会话信息；header 里的 cwd 决定要重建哪套项目环境。"],
+        diagram: "{\n  \"type\": \"session\",\n  \"version\": \"...\",\n  \"id\": \"...\",\n  \"timestamp\": \"...\",\n  \"cwd\": \"C:\\\\Users\\\\orange\\\\Desktop\\\\study\\\\pi\\\\my-test\",\n  \"parentSession\": \"...\"\n}",
+      },
+      {
         heading: "从 JSONL 恢复时到底发生了什么？",
         diagram: "JSONL header.cwd\n  ↓\nSessionManager.open(sessionPath)\n  ↓\nRuntime 销毁旧 session\n  ↓\ncreateRuntime({ cwd: header.cwd, ... })\n  ↓\ncreateAgentSessionServices({ cwd })\n  ↓\n重新读取该项目的设置、资源、扩展与认证\n  ↓\nruntime.session 指向新的 AgentSession",
       },
       {
-        callout: ["JSONL 保存事实，环境在外部重建", "会话文件保存历史、会话树、ID 和原 cwd；Settings、资源加载器和模型认证仍来自对应 cwd 与 agentDir。Runtime 恢复时正是通过 header 里的 cwd 重新搭建项目环境。"],
+        callout: ["JSONL 保存事实，环境在外部重建", "JSONL 保存历史、会话树、session id 和原 cwd 等“会话事实”；项目目录保存代码、Git 状态和项目级资源；agentDir 保存认证、模型配置和用户级扩展。Runtime 恢复时通过 header 里的 cwd 重新搭建项目环境。"],
+      },
+    ],
+  },
+  {
+    id: "full-control",
+    label: "官方示例：Full Control",
+    source: "13-full-control.ts",
+    minutes: "约 12 分钟",
+    lead: "最后一章回到官方示例：当你不想让 SDK 自动发现任何东西时，手写 ResourceLoader、显式传入模型、设置与工具，把一次会话的每个输入都握在自己手里。",
+    blocks: [
+      {
+        heading: "什么时候需要 Full Control？",
+        paragraphs: [
+          "默认装配适合大多数应用：<code>DefaultResourceLoader</code> 发现项目资源，<code>ModelRuntime</code> 读取本机认证，<code>SettingsManager</code> 合并全局与项目设置。",
+          "Full Control 则相反。官方示例 <code>12-full-control.ts</code> 的注释是 “Replace everything - no discovery, explicit configuration”：替换一切，不做发现，全部显式配置。它适合嵌入到受控产品、测试环境或需要严格复现的宿主程序。",
+        ],
+        diagram: "默认装配\ncreateAgentSession()\n├─ DefaultResourceLoader 自动发现资源\n├─ ModelRuntime 读取 agentDir 认证\n└─ SettingsManager 合并全局 + 项目\n\nFull Control\ncreateAgentSession({ ...全部显式传入 })\n├─ 手写 ResourceLoader（空发现 + 自有提示词）\n├─ 自定义 ModelRuntime（指定认证与模型文件）\n├─ SettingsManager.inMemory()\n└─ 工具白名单 + 内存会话",
+      },
+      {
+        heading: "手写一个 ResourceLoader",
+        paragraphs: [
+          "不再 <code>new DefaultResourceLoader()</code>，而是直接实现 <code>ResourceLoader</code> 接口：<code>getExtensions</code> / <code>getSkills</code> / <code>getPrompts</code> / <code>getThemes</code> / <code>getAgentsFiles</code> 全部返回空，<code>getSystemPrompt()</code> 返回自己写的提示词，<code>reload()</code> 是空操作。",
+          "这意味着没有任何项目资源、AGENTS.md 或扩展会进入会话——你返回什么，会话就只拥有什么。",
+        ],
+      },
+      {
+        heading: "显式装配的六个输入",
+        bullets: [
+          "<code>model</code>：用 <code>getModel(\"anthropic\", \"claude-sonnet-4-5\")</code> 从内置目录精确取模型。",
+          "<code>modelRuntime</code>：自定义 <code>authPath</code> / <code>modelsPath</code>，并用 <code>setRuntimeApiKey()</code> 注入临时 Key。",
+          "<code>settingsManager</code>：<code>SettingsManager.inMemory()</code>，不读也不写磁盘 settings.json。",
+          "<code>resourceLoader</code>：上面手写的实现，发现结果全部为空。",
+          "<code>tools</code>：白名单只留 <code>read</code> 与 <code>bash</code>，工具能力最小化。",
+          "<code>sessionManager</code>：<code>SessionManager.inMemory(cwd)</code>，运行结束不留会话文件。",
+        ],
+      },
+      {
+        heading: "本项目的对照实现",
+        paragraphs: [
+          "本章源码 <code>13-full-control.ts</code> 按同样的结构重写了官方示例，并补上中文注释。运行它的方式与其他章一致：<code>npm run example -- src/13-full-control.ts</code>。",
+          "官方原文见 <a href=\"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/sdk/12-full-control.ts\">12-full-control.ts</a>。",
+        ],
+      },
+      {
+        callout: ["边界越大，责任越大", "Full Control 不会替你发现项目规则、Skills 或扩展，也不会合并用户设置。选择它之前，先确认你确实要自己承担这些装配责任。"],
       },
     ],
   },
@@ -444,8 +564,15 @@ function renderBlocks(blocks) {
     const bullets = block.bullets
       ? `<ul>${block.bullets.map((bullet) => `<li>${bullet}</li>`).join("")}</ul>`
       : "";
+    const table = block.table
+      ? `<div class="table-wrap"><table><thead><tr>${block.table.head
+          .map((cell) => `<th>${cell}</th>`)
+          .join("")}</tr></thead><tbody>${block.table.rows
+          .map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`)
+          .join("")}</tbody></table></div>`
+      : "";
     const diagram = block.diagram ? `<pre class="diagram">${block.diagram}</pre>` : "";
-    return `<section class="lesson"><h3>${block.heading}</h3>${paragraphs}${bullets}${diagram}</section>`;
+    return `<section class="lesson"><h3>${block.heading}</h3>${paragraphs}${bullets}${table}${diagram}</section>`;
   }).join("");
 }
 

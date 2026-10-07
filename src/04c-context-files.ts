@@ -13,7 +13,7 @@ const loader = new DefaultResourceLoader({
       ...current.agentsFiles,
       {
         path: "/virtual/AGENTS.md",
-        content: "# Project rules\n\n- Use TypeScript strict mode\n- Prefer const over let",
+        content: "# Project rules\n\n- Use TypeScript strict mode\n- No any types\n- Prefer const over let",
       },
     ],
   }),

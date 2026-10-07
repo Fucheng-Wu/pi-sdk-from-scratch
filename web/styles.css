@@ -21,7 +21,8 @@ a { color: inherit; }
 
 .page-shell {
   display: grid;
-  grid-template-columns: 242px minmax(440px, 1fr) minmax(350px, 40vw);
+  /* 侧栏固定；正文与代码面板平分剩余宽度。 */
+  grid-template-columns: 242px minmax(0, 1fr) minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -49,7 +50,7 @@ a { color: inherit; }
 .sidebar-foot a { text-decoration: none; }
 .sidebar-foot a:hover { color: var(--accent-dark); text-decoration: underline; }
 
-.main-content { max-width: 760px; padding: 68px clamp(32px, 6vw, 92px) 64px; }
+.main-content { width: 100%; padding: 68px clamp(28px, 4vw, 92px) 64px; }
 .eyebrow { margin: 0 0 16px; color: var(--accent-dark); font: 700 11px ui-monospace, monospace; letter-spacing: .11em; }
 .hero h1 { max-width: 650px; margin: 0; font: 500 clamp(34px, 4vw, 56px)/1.08 Georgia, "Noto Serif SC", serif; letter-spacing: -.04em; }
 .hero-copy { max-width: 590px; margin: 27px 0 19px; color: #4f4f4a; font-size: 16px; line-height: 1.85; }
@@ -68,6 +69,14 @@ a { color: inherit; }
 .lesson ul { margin: 12px 0 0; padding-left: 20px; }
 .lesson li + li { margin-top: 5px; }
 .lesson code { padding: 2px 5px; border-radius: 3px; background: #e9e7df; color: #5e281b; font: .88em ui-monospace, monospace; }
+.lesson a { color: var(--accent-dark); }
+.lesson a:hover { color: var(--accent); }
+.lesson .table-wrap { overflow-x: auto; margin-top: 18px; }
+.lesson table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.lesson th, .lesson td { padding: 8px 11px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+.lesson th { background: #efeee8; font: 700 12px ui-monospace, monospace; letter-spacing: .02em; }
+.lesson td { color: #454540; line-height: 1.65; }
+.lesson td code { font-size: .85em; }
 .callout { margin: 31px 0; padding: 17px 18px; border-left: 3px solid var(--accent); background: #f1e8dc; }
 .callout b { display: block; margin-bottom: 5px; color: var(--accent-dark); font-size: 13px; }
 .callout p { margin: 0; font-size: 14px; line-height: 1.75; }

@@ -17,8 +17,12 @@ console.log("Continued session:", continued.sessionFile);
 if (modelFallbackMessage) console.log("Model fallback:", modelFallbackMessage);
 continued.dispose();
 
+// list() 返回会话元数据（含 id、firstMessage、path），可先展示再按精确路径打开。
 const sessions = await SessionManager.list(cwd);
-console.log("Known sessions:", sessions.slice(0, 3).map((item) => item.id));
+console.log(`Known sessions: ${sessions.length}`);
+for (const info of sessions.slice(0, 3)) {
+  console.log(`  ${info.id.slice(0, 8)}... - "${info.firstMessage.slice(0, 30)}..."`);
+}
 if (sessions[0]) {
   const { session: opened } = await createAgentSession({ sessionManager: SessionManager.open(sessions[0].path) });
   console.log("Opened:", opened.sessionId);
